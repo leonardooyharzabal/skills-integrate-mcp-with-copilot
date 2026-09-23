@@ -28,6 +28,30 @@ header h1 {
   margin-bottom: 10px;
 }
 
+#auth-container {
+  margin-top: 20px;
+}
+
+#login-form,
+#logged-in {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+#login-form input {
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+#logged-in button {
+  background-color: #3949ab;
+  padding: 7px 12px;
+}
+
 main {
   display: flex;
   flex-wrap: wrap;

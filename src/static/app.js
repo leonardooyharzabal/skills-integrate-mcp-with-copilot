@@ -3,6 +3,32 @@ document.addEventListener("DOMContentLoaded", () => {
   const activitySelect = document.getElementById("activity");
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
+  const loginForm = document.getElementById("login-form");
+  const loggedIn = document.getElementById("logged-in");
+  const loggedInAs = document.getElementById("logged-in-as");
+  const logoutButton = document.getElementById("logout-button");
+  const signupContainer = document.getElementById("signup-container");
+  let authToken = localStorage.getItem("teacherToken");
+  let teacherUsername = localStorage.getItem("teacherUsername");
+
+  function showMessage(text, className) {
+    messageDiv.textContent = text;
+    messageDiv.className = className;
+    messageDiv.classList.remove("hidden");
+    setTimeout(() => messageDiv.classList.add("hidden"), 5000);
+  }
+
+  function updateAuthState() {
+    const isLoggedIn = Boolean(authToken && teacherUsername);
+    loginForm.classList.toggle("hidden", isLoggedIn);
+    loggedIn.classList.toggle("hidden", !isLoggedIn);
+    signupContainer.classList.toggle("hidden", !isLoggedIn);
+    loggedInAs.textContent = isLoggedIn ? `Logged in as ${teacherUsername}` : "";
+  }
+
+  function authHeaders() {
+    return authToken ? { Authorization: `Bearer ${authToken}` } : {};
+  }
 
   // Function to fetch activities from API
   async function fetchActivities() {
@@ -29,8 +55,11 @@ document.addEventListener("DOMContentLoaded", () => {
               <ul class="participants-list">
                 ${details.participants
                   .map(
-                    (email) =>
-                      `<li><span class="participant-email">${email}</span><button class="delete-btn" data-activity="${name}" data-email="${email}">❌</button></li>`
+                    (email) => `<li><span class="participant-email">${email}</span>${
+                      authToken
+                        ? `<button class="delete-btn" data-activity="${name}" data-email="${email}">Remove</button>`
+                        : ""
+                    }</li>`
                   )
                   .join("")}
               </ul>
@@ -92,20 +121,18 @@ document.addEventListener("DOMContentLoaded", () => {
         // Refresh activities list to show updated participants
         fetchActivities();
       } else {
-        messageDiv.textContent = result.detail || "An error occurred";
-        messageDiv.className = "error";
+        showMessage(result.detail || "An error occurred", "error");
       }
-
-      messageDiv.classList.remove("hidden");
-
-      // Hide message after 5 seconds
-      setTimeout(() => {
-        messageDiv.classList.add("hidden");
-      }, 5000);
+      if (response.status === 401) {
+        authToken = null;
+        teacherUsername = null;
+        localStorage.removeItem("teacherToken");
+        localStorage.removeItem("teacherUsername");
+        updateAuthState();
+        fetchActivities();
+      }
     } catch (error) {
-      messageDiv.textContent = "Failed to unregister. Please try again.";
-      messageDiv.className = "error";
-      messageDiv.classList.remove("hidden");
+      showMessage("Failed to unregister. Please try again.", "error");
       console.error("Error unregistering:", error);
     }
   }
@@ -124,6 +151,7 @@ document.addEventListener("DOMContentLoaded", () => {
         )}/signup?email=${encodeURIComponent(email)}`,
         {
           method: "POST",
+          headers: authHeaders(),
         }
       );
 
@@ -137,24 +165,64 @@ document.addEventListener("DOMContentLoaded", () => {
         // Refresh activities list to show updated participants
         fetchActivities();
       } else {
-        messageDiv.textContent = result.detail || "An error occurred";
-        messageDiv.className = "error";
+        showMessage(result.detail || "An error occurred", "error");
       }
-
-      messageDiv.classList.remove("hidden");
-
-      // Hide message after 5 seconds
-      setTimeout(() => {
-        messageDiv.classList.add("hidden");
-      }, 5000);
+      if (response.status === 401) {
+        authToken = null;
+        teacherUsername = null;
+        localStorage.removeItem("teacherToken");
+        localStorage.removeItem("teacherUsername");
+        updateAuthState();
+      }
     } catch (error) {
-      messageDiv.textContent = "Failed to sign up. Please try again.";
-      messageDiv.className = "error";
-      messageDiv.classList.remove("hidden");
+      showMessage("Failed to sign up. Please try again.", "error");
       console.error("Error signing up:", error);
     }
   });
 
+  loginForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const username = document.getElementById("username").value;
+    const password = document.getElementById("password").value;
+
+    try {
+      const response = await fetch("/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        showMessage(result.detail || "Login failed", "error");
+        return;
+      }
+
+      authToken = result.token;
+      teacherUsername = result.username;
+      localStorage.setItem("teacherToken", authToken);
+      localStorage.setItem("teacherUsername", teacherUsername);
+      loginForm.reset();
+      updateAuthState();
+      fetchActivities();
+      showMessage("Teacher login successful", "success");
+    } catch (error) {
+      showMessage("Failed to log in. Please try again.", "error");
+      console.error("Error logging in:", error);
+    }
+  });
+
+  logoutButton.addEventListener("click", () => {
+    authToken = null;
+    teacherUsername = null;
+    localStorage.removeItem("teacherToken");
+    localStorage.removeItem("teacherUsername");
+    updateAuthState();
+    fetchActivities();
+    showMessage("You have been logged out", "success");
+  });
+
   // Initialize app
+  updateAuthState();
   fetchActivities();
 });
